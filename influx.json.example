@@ -1,0 +1,6 @@
+{
+	"server": "https://influx.example.com:8086/",
+	"database": "dns",
+	"username": "dns",
+	"password": "topsecret"
+}
