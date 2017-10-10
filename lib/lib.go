@@ -1,3 +1,4 @@
+// Package lib provides a library of commonly used functions for dns-tools
 package lib
 
 import (
@@ -17,7 +18,7 @@ var (
 // Critics may even find a way to blame systemd for this ;)
 // related: https://github.com/systemd/systemd/issues/5897
 func Lookup(fqdn, rtype string) ([]string, error) {
-	rdatas := []string{}
+	var rdatas []string
 	err := IsValidFQDN(fqdn)
 	if err != nil {
 		return rdatas, err
@@ -45,7 +46,7 @@ func Lookup(fqdn, rtype string) ([]string, error) {
 		var addresses []string
 		addresses, err = net.LookupHost(fqdn)
 		for _, address := range addresses {
-			if strings.Contains(address, ":") {
+			if IsValidIPv6(address) == nil {
 				rdatas = append(rdatas, address)
 			}
 		}
@@ -53,7 +54,7 @@ func Lookup(fqdn, rtype string) ([]string, error) {
 		var addresses []string
 		addresses, err = net.LookupHost(fqdn)
 		for _, address := range addresses {
-			if !strings.Contains(address, ":") {
+			if IsValidIPv4(address) == nil {
 				rdatas = append(rdatas, address)
 			}
 		}
@@ -134,7 +135,8 @@ func IsValidFQDN(fqdn string) error {
 // IsValidTTL validates an integer for an acceptable DNS Time To Live
 // value
 func IsValidTTL(ttl int) error {
-	if ttl < 0 || ttl > 2147483647 {
+	// max: https://tools.ietf.org/html/rfc2181#section-8
+	if ttl < 0 || ttl > ((1<<31)-1) {
 		return fmt.Errorf("invalid TTL: %v", ttl)
 	}
 	return nil

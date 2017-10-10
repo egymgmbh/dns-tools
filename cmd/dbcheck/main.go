@@ -35,8 +35,8 @@ func main() {
 		}
 	}
 	if exitOK {
-		log.Printf("Looks good!")
+		log.Print("Looks good!")
 	} else {
-		log.Fatalf("Errors found!")
+		log.Fatal("Errors found!")
 	}
 }

@@ -1,7 +1,6 @@
 sudo: false
 language: go
 go:
-  - 1.8
   - 1.9
   - master
 install:
@@ -9,36 +8,8 @@ install:
   - go get github.com/Masterminds/glide
   - glide install
 script:
-  - golint                             github.com/egymgmbh/dns-tools/config
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/config
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/config
-  - golint                             github.com/egymgmbh/dns-tools/gcp
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/gcp
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/gcp
-  - golint                             github.com/egymgmbh/dns-tools/influx
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/influx
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/influx
-  - golint                             github.com/egymgmbh/dns-tools/lib
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/lib
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/lib
-  - golint                             github.com/egymgmbh/dns-tools/rrdb
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/rrdb
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/rrdb
-  - golint                             github.com/egymgmbh/dns-tools/cmd/dbcheck
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/cmd/dbcheck
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/cmd/dbcheck
-  - golint                             github.com/egymgmbh/dns-tools/cmd/mzcreate
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/cmd/mzcreate
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/cmd/mzcreate
-  - golint                             github.com/egymgmbh/dns-tools/cmd/mzdump
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/cmd/mzdump
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/cmd/mzdump
-  - golint                             github.com/egymgmbh/dns-tools/cmd/mzmon
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/cmd/mzmon
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/cmd/mzmon
-  - golint                             github.com/egymgmbh/dns-tools/cmd/rrlookup
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/cmd/rrlookup
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/cmd/rrlookup
-  - golint                             github.com/egymgmbh/dns-tools/cmd/rrpush
-  - GO15VENDOREXPERIMENT=1 go build -v github.com/egymgmbh/dns-tools/cmd/rrpush
-  - GO15VENDOREXPERIMENT=1 go test  -v github.com/egymgmbh/dns-tools/cmd/rrpush
+  - golint -set_exit_status $(go list ./...)
+  - go fmt ./...
+  - go build -v ./...
+  - go test -v ./...
+  - go vet -v ./...

@@ -10,13 +10,15 @@ import (
 
 // RRDB holds a resource record database
 type RRDB struct {
-	root         node
-	TotalRecords uint64
+	root node
+	// wrapped in a struct to leave room for future features that require fields
 }
 
+// This is a trie node. Tries are beautiful!
+// https://en.wikipedia.org/wiki/Trie
 type node struct {
 	fqdn       string
-	nodes      map[string]*node
+	children   map[string]*node
 	parent     *node
 	nsRDatas   []string
 	nsTTL      int
@@ -52,8 +54,8 @@ type Mailserver struct {
 func New() *RRDB {
 	return &RRDB{
 		root: node{
-			nodes:  make(map[string]*node),
-			parent: nil,
+			children: make(map[string]*node),
+			parent:   nil,
 		},
 	}
 }
@@ -110,7 +112,7 @@ func (nd *node) records(ttl int, withChildren bool) []*Record {
 	}
 
 	if withChildren {
-		for _, next := range nd.nodes {
+		for _, next := range nd.children {
 			records = append(records, next.records(ttl, true)...)
 		}
 	}
@@ -149,9 +151,14 @@ func (nd *node) hasAAAA() bool {
 }
 
 func (nd *node) hasChildren() bool {
-	return len(nd.nodes) != 0
+	return len(nd.children) != 0
 }
 
+// node finds a node identified by a set of hierachical labels (ls means label
+// set). This function is recursive and calls itself usually a couple of times
+// reducing the applied label set in every recursion by decreasing the index.
+// Example: FQDN foo.example.com. has label set ['foo', 'example', 'com']
+// and is recursed as first 'com' then 'example' and finally 'foo'.
 func (nd *node) node(ls []string, idx int, create bool) (*node, error) {
 	// Hooray, it's us!
 	if idx < 0 {
@@ -163,21 +170,21 @@ func (nd *node) node(ls []string, idx int, create bool) (*node, error) {
 	}
 	// now we can go deeper
 	label := ls[idx]
-	if _, ok := nd.nodes[label]; !ok {
+	if _, ok := nd.children[label]; !ok {
 		// Ah, snap, no node for that label!
 		if create {
 			// Let's summon one :)
-			nd.nodes[label] = &node{
-				fqdn:   strings.Join(ls[idx:], ".") + ".",
-				nodes:  make(map[string]*node),
-				parent: nd,
+			nd.children[label] = &node{
+				fqdn:     strings.Join(ls[idx:], ".") + ".",
+				children: make(map[string]*node),
+				parent:   nd,
 			}
 		} else {
 			return nil, fmt.Errorf("FQDN not found")
 		}
 	}
 	// Nothing to see here, digging deeper.
-	return nd.nodes[label].node(ls, idx-1, create)
+	return nd.children[label].node(ls, idx-1, create)
 }
 
 func (db *RRDB) node(fqdn string, create bool) (*node, error) {
@@ -238,7 +245,8 @@ func (db *RRDB) SetNS(fqdn string, ttl int, rdatas []string) error {
 	return nil
 }
 
-// NS retrieves the NS record of a FQDN
+// NS retrieves the NS record of a FQDN. If the record has no individual
+// TTL, a default TTL (paramter ttl) will be inserted.
 func (db *RRDB) NS(fqdn string, ttl int) (*Record, error) {
 	nd, err := db.node(fqdn, false)
 	if err != nil {
@@ -321,7 +329,8 @@ func (db *RRDB) SetMX(fqdn string, ttl int, rdatas []string) error {
 	return nil
 }
 
-// MX retrieves the MX record of a FQDN
+// MX retrieves the MX record of a FQDN. If the record has no individual
+// TTL, a default TTL (paramter ttl) will be inserted.
 func (db *RRDB) MX(fqdn string, ttl int) (*Record, error) {
 	nd, err := db.node(fqdn, false)
 	if err != nil {
@@ -406,7 +415,8 @@ func (db *RRDB) AddTXT(fqdn string, ttl int, rdata string) error {
 	return nil
 }
 
-// TXT retrieves the TXT record of a FQDN
+// TXT retrieves the TXT record of a FQDN. If the record has no individual
+// TTL, a default TTL (paramter ttl) will be inserted.
 func (db *RRDB) TXT(fqdn string, ttl int) (*Record, error) {
 	nd, err := db.node(fqdn, false)
 	if err != nil {
@@ -473,7 +483,8 @@ func (db *RRDB) SetCNAME(fqdn string, ttl int, rdata string) error {
 	return nil
 }
 
-// CNAME retrieves the CNAME record of a FQDN
+// CNAME retrieves the CNAME record of a FQDN. If the record has no individual
+// TTL, a default TTL (paramter ttl) will be inserted.
 func (db *RRDB) CNAME(fqdn string, ttl int) (*Record, error) {
 	nd, err := db.node(fqdn, false)
 	if err != nil {
@@ -542,7 +553,8 @@ func (db *RRDB) SetA(fqdn string, ttl int, rdatas []string) error {
 	return nil
 }
 
-// A retrieves the A record of a FQDN
+// A retrieves the A record of a FQDN. If the record has no individual
+// TTL, a default TTL (paramter ttl) will be inserted.
 func (db *RRDB) A(fqdn string, ttl int) (*Record, error) {
 	nd, err := db.node(fqdn, false)
 	if err != nil {
@@ -611,7 +623,8 @@ func (db *RRDB) SetAAAA(fqdn string, ttl int, rdatas []string) error {
 	return nil
 }
 
-// AAAA retrieves the AAAA record of a FQDN
+// AAAA retrieves the AAAA record of a FQDN. If the record has no individual
+// TTL, a default TTL (paramter ttl) will be inserted.
 func (db *RRDB) AAAA(fqdn string, ttl int) (*Record, error) {
 	nd, err := db.node(fqdn, false)
 	if err != nil {

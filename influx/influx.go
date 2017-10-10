@@ -16,16 +16,17 @@ type Config struct {
 	Password string `json:"password"`
 }
 
-// Load parses a InfluxDB client configuration from a simple JSON file
-func (conf *Config) Load(filepath string) error {
+// LoadConfig parses a InfluxDB client configuration from a simple JSON file
+func LoadConfig(filepath string) (Config, error) {
+	var conf Config
 	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
-		return fmt.Errorf("read Influx config file: %v", err)
+		return conf, fmt.Errorf("read Influx config file: %v", err)
 	}
 
 	err = json.Unmarshal(data, &conf)
 	if err != nil {
-		return fmt.Errorf("parse Influx config file: %v", err)
+		return conf, fmt.Errorf("parse Influx config file: %v", err)
 	}
-	return nil
+	return conf, nil
 }

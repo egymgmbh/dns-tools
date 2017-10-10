@@ -31,7 +31,7 @@ func main() {
 	totalOK := 0
 
 	for _, mz := range config.ManagedZones {
-		records, err := db.Zone(mz.FQDN, mz.TTL)
+		records, err := db.Zone(mz.FQDN, 0)
 		if err != nil {
 			log.Printf("%v: %v", mz.FQDN, err)
 			totalNotInDatabase++

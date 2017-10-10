@@ -6,10 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	invalidLookupServer = "192.0.2.1:53"
-	validLookupServer   = "[2001:4860:4860::8888]:53"
-	invalidLookups      = []struct {
+func TestLookup(t *testing.T) {
+	invalidLookups := []struct {
 		fqdn  string
 		rtype string
 	}{
@@ -26,7 +24,7 @@ var (
 			rtype: "AAAA",
 		},
 	}
-	validLookups = []struct {
+	validLookups := []struct {
 		fqdn  string
 		rtype string
 		out   []string
@@ -74,85 +72,6 @@ var (
 			out:   []string{"2001:67c:26f4::1"},
 		},
 	}
-	invalidIPv4s = []string{
-		"",
-		"1.2.3",
-		"192.0.2.256",
-		"2001:db8::1",
-		"2001:db8::cafe",
-	}
-	validIPv4s = []string{
-		"192.0.2.1",
-		"192.0.2.155",
-	}
-	invalidIPv6s = []string{
-		"",
-		"193.160.39.1",
-		"2001:db8:::1",
-		"2001:db8::a::1",
-		"2001:db8::a::g",
-	}
-	validIPv6s = []string{
-		"2001:db8::1",
-		"2001:db8::cafe",
-		"2001:db8::193.160.39.1",
-		"3000::1",
-		"::",
-	}
-	invalidFQDNs = []string{
-		"",
-		".",
-		"example.com",
-		"-foo.example.com",
-		"-foo.example.com.",
-		"--foo.example.com.",
-		"foo-.example.com.",
-		"foo--.example.com.",
-	}
-	validFQDNs = []string{
-		"com.",
-		"example.com.",
-		"foo.example.com.",
-		"f-o-o.example.com.",
-		"xn--foo-bar.example.com.",
-		"_dmarc.example.com.",
-		"_759c7c23f786497a69e4f2ea4eb6c329.example.com.",
-		"fefa2c1f7d6ed2027ab0bf42326b3fc2.fd47d3d85924bd523093122a6add7633.example.com.",
-	}
-	invalidTTLs = []int{-300, -3, -2, -1, 2147483648, 2147483649, 2147483650}
-	validTTLs   = []int{0, 1, 2, 3, 10, 300, 2147483645, 2147483646, 2147483647}
-	quotedTexts = []struct {
-		in  string
-		out string
-	}{
-		{
-			in:  "Free drinks at the Foo bar!",
-			out: "\"Free\" \"drinks\" \"at\" \"the\" \"Foo\" \"bar!\"",
-		},
-		{
-			in:  "So long and thanks for all the fish...",
-			out: "\"So\" \"long\" \"and\" \"thanks\" \"for\" \"all\" \"the\" \"fish...\"",
-		},
-		{
-			in:  "All watched over by machines of love and grace",
-			out: "\"All\" \"watched\" \"over\" \"by\" \"machines\" \"of\" \"love\" \"and\" \"grace\"",
-		},
-		{
-			in:  "",
-			out: "",
-		},
-		{
-			in:  " ",
-			out: "",
-		},
-		{
-			in:  "foo",
-			out: "\"foo\"",
-		},
-	}
-)
-
-func TestLookup(t *testing.T) {
 	for _, test := range validLookups {
 		rdatas, err := Lookup(test.fqdn, test.rtype)
 		assert.Equal(t, nil, err)
@@ -234,6 +153,17 @@ func TestMakeFQDN(t *testing.T) {
 }
 
 func TestIsValidIPv4(t *testing.T) {
+	invalidIPv4s := []string{
+		"",
+		"1.2.3",
+		"192.0.2.256",
+		"2001:db8::1",
+		"2001:db8::cafe",
+	}
+	validIPv4s := []string{
+		"192.0.2.1",
+		"192.0.2.155",
+	}
 	for _, address := range invalidIPv4s {
 		assert.NotEqual(t, nil, IsValidIPv4(address))
 	}
@@ -243,6 +173,20 @@ func TestIsValidIPv4(t *testing.T) {
 }
 
 func TestIsValidIPv6(t *testing.T) {
+	invalidIPv6s := []string{
+		"",
+		"193.160.39.1",
+		"2001:db8:::1",
+		"2001:db8::a::1",
+		"2001:db8::a::g",
+	}
+	validIPv6s := []string{
+		"2001:db8::1",
+		"2001:db8::cafe",
+		"2001:db8::193.160.39.1",
+		"3000::1",
+		"::",
+	}
 	for _, address := range invalidIPv6s {
 		assert.NotEqual(t, nil, IsValidIPv6(address))
 	}
@@ -252,6 +196,8 @@ func TestIsValidIPv6(t *testing.T) {
 }
 
 func TestIsValidTTL(t *testing.T) {
+	invalidTTLs := []int{-300, -3, -2, -1, 2147483648, 2147483649, 2147483650}
+	validTTLs := []int{0, 1, 2, 3, 10, 300, 2147483645, 2147483646, 2147483647}
 	// invalid
 	for _, ttl := range invalidTTLs {
 		err := IsValidTTL(ttl)
@@ -265,6 +211,26 @@ func TestIsValidTTL(t *testing.T) {
 }
 
 func TestIsValidFQDN(t *testing.T) {
+	invalidFQDNs := []string{
+		"",
+		".",
+		"example.com",
+		"-foo.example.com",
+		"-foo.example.com.",
+		"--foo.example.com.",
+		"foo-.example.com.",
+		"foo--.example.com.",
+	}
+	validFQDNs := []string{
+		"com.",
+		"example.com.",
+		"foo.example.com.",
+		"f-o-o.example.com.",
+		"xn--foo-bar.example.com.",
+		"_dmarc.example.com.",
+		"_759c7c23f786497a69e4f2ea4eb6c329.example.com.",
+		"fefa2c1f7d6ed2027ab0bf42326b3fc2.fd47d3d85924bd523093122a6add7633.example.com.",
+	}
 	// invalid
 	for _, fqdn := range invalidFQDNs {
 		err := IsValidFQDN(fqdn)
@@ -278,6 +244,35 @@ func TestIsValidFQDN(t *testing.T) {
 }
 
 func TestTextToQuotedStrings(t *testing.T) {
+	quotedTexts := []struct {
+		in  string
+		out string
+	}{
+		{
+			in:  "Free drinks at the Foo bar!",
+			out: "\"Free\" \"drinks\" \"at\" \"the\" \"Foo\" \"bar!\"",
+		},
+		{
+			in:  "So long and thanks for all the fish...",
+			out: "\"So\" \"long\" \"and\" \"thanks\" \"for\" \"all\" \"the\" \"fish...\"",
+		},
+		{
+			in:  "All watched over by machines of love and grace",
+			out: "\"All\" \"watched\" \"over\" \"by\" \"machines\" \"of\" \"love\" \"and\" \"grace\"",
+		},
+		{
+			in:  "",
+			out: "",
+		},
+		{
+			in:  " ",
+			out: "",
+		},
+		{
+			in:  "foo",
+			out: "\"foo\"",
+		},
+	}
 	for _, s := range quotedTexts {
 		assert.Equal(t, s.out, TextToQuotedStrings(s.in))
 	}

@@ -14,42 +14,42 @@ import (
 
 // YAMLMailserver struct to load YAML data into: A singe mailserver with hostname
 // and preference
-type YAMLMailserver struct {
+type yamlMailserver struct {
 	Mailserver string
 	Preference uint16
 }
 
 // YAMLMail struct to load YAML data into: A list of mailservers and an optional
 // TTL
-type YAMLMail struct {
+type yamlMail struct {
 	TTL         int
-	Mailservers []YAMLMailserver
+	Mailservers []yamlMailserver
 }
 
 // YAMLForwarding struct to load YAML data into: A DNS forwarding via canonical
 // name and optional TTL
-type YAMLForwarding struct {
+type yamlForwarding struct {
 	TTL    int
 	Target string
 }
 
 // YAMLDelegation struct to load YAML data into: A list of nameserver
 // responsible for a delegated zone and an optional TTL
-type YAMLDelegation struct {
+type yamlDelegation struct {
 	TTL         int
 	Nameservers []string
 }
 
 // YAMLAddresses struct to load YAML data into: A list of IP and legacy IP
 // addresses and an optional TTL
-type YAMLAddresses struct {
+type yamlAddresses struct {
 	TTL      int
 	Literals []string
 }
 
 // YAMLTexts struct to load YAML data into: A list of textual data associated
 // with a name and an optional TTL
-type YAMLTexts struct {
+type yamlTexts struct {
 	TTL  int
 	Data []string
 }
@@ -57,42 +57,41 @@ type YAMLTexts struct {
 // YAMLName struct to load YAML data into: A single name (label), may contain one
 // forwarding or one list of delegations or a combination of mailservers, texts
 // and addresses
-type YAMLName struct {
+type yamlName struct {
 	Name        string
 	Description string
-	Forwarding  YAMLForwarding
-	Delegation  YAMLDelegation
-	Mail        YAMLMail
-	Texts       YAMLTexts
-	Addresses   YAMLAddresses
+	Forwarding  yamlForwarding
+	Delegation  yamlDelegation
+	Mail        yamlMail
+	Texts       yamlTexts
+	Addresses   yamlAddresses
 }
 
 // YAMLTemplate struct to load YAML data into: A template containing names and an
 // optional description
-type YAMLTemplate struct {
-	Template    string
+type yamlTemplate struct {
+	Template    string // Name of the template
 	Description string
-	Templates   []string
-	Names       []YAMLName
+	Names       []yamlName
 }
 
 // YAMLZone struct to load YAML data into: A zone definition containing TTL,
 // description, templates and names. All optional but should hold at least one.
-type YAMLZone struct {
-	Zone        string
+type yamlZone struct {
+	Zone        string // FQDN of the zone
 	Description string
 	TTL         int
 	Templates   []string
-	Names       []YAMLName
+	Names       []yamlName
 }
 
 // YAMLFile holds the full YAML file data
-type YAMLFile struct {
-	Templates []YAMLTemplate
-	Zones     []YAMLZone
+type yamlFile struct {
+	Templates []yamlTemplate
+	Zones     []yamlZone
 }
 
-func (db *RRDB) loadNS(fqdn string, delegation YAMLDelegation) error {
+func (db *RRDB) loadNS(fqdn string, delegation yamlDelegation) error {
 	rdatas := []string{}
 	for _, rdata := range delegation.Nameservers {
 		rdatas = append(rdatas, strings.TrimSpace(rdata))
@@ -103,7 +102,7 @@ func (db *RRDB) loadNS(fqdn string, delegation YAMLDelegation) error {
 	return db.SetNS(fqdn, delegation.TTL, rdatas)
 }
 
-func (db *RRDB) loadMX(fqdn string, mail YAMLMail) error {
+func (db *RRDB) loadMX(fqdn string, mail yamlMail) error {
 	rdatas := []string{}
 	for _, mailserver := range mail.Mailservers {
 		rdata := fmt.Sprintf("%d %s", mailserver.Preference,
@@ -116,7 +115,7 @@ func (db *RRDB) loadMX(fqdn string, mail YAMLMail) error {
 	return db.SetMX(fqdn, mail.TTL, rdatas)
 }
 
-func (db *RRDB) loadTXT(fqdn string, texts YAMLTexts) error {
+func (db *RRDB) loadTXT(fqdn string, texts yamlTexts) error {
 	var err error
 	for _, rdata := range texts.Data {
 		err = db.AddTXT(fqdn, texts.TTL, strings.TrimSpace(rdata))
@@ -127,7 +126,7 @@ func (db *RRDB) loadTXT(fqdn string, texts YAMLTexts) error {
 	return err
 }
 
-func (db *RRDB) loadCNAME(fqdn string, forwarding YAMLForwarding) error {
+func (db *RRDB) loadCNAME(fqdn string, forwarding yamlForwarding) error {
 
 	rdata := strings.TrimSpace(forwarding.Target)
 	if len(rdata) == 0 {
@@ -136,7 +135,7 @@ func (db *RRDB) loadCNAME(fqdn string, forwarding YAMLForwarding) error {
 	return db.SetCNAME(fqdn, forwarding.TTL, rdata)
 }
 
-func (db *RRDB) loadAddresses(fqdn string, addresses YAMLAddresses) error {
+func (db *RRDB) loadAddresses(fqdn string, addresses yamlAddresses) error {
 	aRDatas := []string{}
 	aaaaRDatas := []string{}
 	for _, literal := range addresses.Literals {
@@ -167,7 +166,33 @@ func (db *RRDB) loadAddresses(fqdn string, addresses YAMLAddresses) error {
 	return nil
 }
 
-func (db *RRDB) loadNames(names []YAMLName, zone YAMLZone) error {
+// This function loads the names of a template or a zone into the database.
+// That is, the labels [slang: hostnames] and their associated records of
+// various types, such as NS, MX, TXT, and so on.
+// Example:
+// zones:
+// - zone: example.com.
+//   names:                                     `\
+//   - name: '@'                        `\       |
+//     mail:                             |       |
+//       ttl: 7200                       | N     |
+//       mailservers:                    | A     |
+//       - mailserver: mx1.example.com.  | M     |
+//         preferece: 10                 | E     | N
+//       - mailserver: mx2.example.com.  |       |
+//         preferece: 20                 |       | A
+//     addresses:                        |       |
+//       literals:                       |       | M
+//       - 2001:db8::1                  ,/       |
+//   - name: foo                        `\       | E
+//     txt:                              |       |
+//       data:                           | N     | S
+//       - "foo bar"                     | A     |
+//       - "hello DNS"                   | M     |
+//     addresses:                        | E     |
+//       literals:                       |       |
+//       - 2001:db8:cafe::1             ,/      ,/
+func (db *RRDB) loadNames(names []yamlName, zone yamlZone) error {
 	for _, name := range names {
 		fqdn := lib.MakeFQDN(name.Name, zone.Zone)
 		err := db.loadNS(fqdn, name.Delegation)
@@ -207,24 +232,24 @@ func NewFromDirectory(directory string) (*RRDB, error) {
 		return nil, err
 	}
 
-	yamlFiles := make(map[string]YAMLFile)
+	yamlFileDatas := make(map[string]yamlFile)
 	for _, fname := range fnames {
 		data, ferr := ioutil.ReadFile(fname)
 		if ferr != nil {
 			return nil, ferr
 		}
-		yamlFile := YAMLFile{}
-		ferr = yaml.UnmarshalStrict(data, &yamlFile)
+		yamlFileData := yamlFile{}
+		ferr = yaml.UnmarshalStrict(data, &yamlFileData)
 		if ferr != nil {
 			return nil, fmt.Errorf("file %v: %v", fname, ferr)
 		}
-		yamlFiles[fname] = yamlFile
+		yamlFileDatas[fname] = yamlFileData
 	}
 
 	// build templates map
-	templates := make(map[string]YAMLTemplate)
-	for fname, yamlFile := range yamlFiles {
-		for _, template := range yamlFile.Templates {
+	templates := make(map[string]yamlTemplate)
+	for fname, yamlFileData := range yamlFileDatas {
+		for _, template := range yamlFileData.Templates {
 			if _, seen := templates[template.Template]; seen {
 				return nil, fmt.Errorf("file %v: template %v: duplicate",
 					fname, template)
@@ -238,8 +263,8 @@ func NewFromDirectory(directory string) (*RRDB, error) {
 	}
 
 	db := New()
-	for fname, yamlFile := range yamlFiles {
-		for _, zone := range yamlFile.Zones {
+	for fname, yamlFileData := range yamlFileDatas {
+		for _, zone := range yamlFileData.Zones {
 			// templates
 			for _, template := range zone.Templates {
 				if _, ok := templates[template]; !ok {
@@ -259,7 +284,7 @@ func NewFromDirectory(directory string) (*RRDB, error) {
 			}
 		}
 	}
-	if len(db.root.nodes) == 0 {
+	if len(db.root.children) == 0 {
 		return nil, fmt.Errorf("empty database")
 	}
 	return db, nil

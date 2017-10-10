@@ -1,3 +1,5 @@
+// Package main provides the mzcreate tool that creates managed zones on
+// Cloud DNS that are in the configuration file but missing on Cloud DNS.
 package main
 
 import (
@@ -13,7 +15,7 @@ import (
 	clouddns "google.golang.org/api/dns/v1"
 )
 
-// DNSNameToMZName converts a DNS zone name into a format that is
+// dnsNameToMZName converts a DNS zone name into a format that is
 // accepted as managed zone name
 func dnsNameToMZName(dnsName string) string {
 	dnsName = strings.Trim(dnsName, ".")
@@ -30,10 +32,13 @@ func main() {
 	configFile := flag.String("config-file", "config.yml",
 		"DNS Tools configuration file.")
 	dryRun := flag.Bool("dry-run", true,
-		"Do not take action on CloudDNS. Just pretend.")
-	gcpSAFile := flag.String("gcp-sa-file", "/secret/gcp-sa.json",
+		"Do not take action on Cloud DNS. Just pretend.")
+	noColor := flag.Bool("no-color", false, "Do not colorize output.")
+	gcpSAFile := flag.String("gcp-sa-file", "secret/gcp-sa.json",
 		"Google Cloud Platform Service Account file in JSON format.")
 	flag.Parse()
+
+	color.NoColor = *noColor
 
 	config, err := config.New(*configFile)
 	if err != nil {
@@ -55,16 +60,16 @@ func main() {
 		gcpManagedZones[mz.DnsName] = true
 	}
 
-	// compare configured managed zones with CloudDNS managed zones
+	// compare configured managed zones with Cloud DNS managed zones
 	totalCreated := 0
 	for _, mz := range config.ManagedZones {
-		log.SetPrefix("zone " + mz.FQDN)
+		log.SetPrefix(mz.FQDN + " ")
 		if _, ok := gcpManagedZones[mz.FQDN]; ok {
 			log.Printf("OK")
 			continue
 		}
 		color.Set(color.FgHiYellow)
-		log.Printf("not on CloudDNS")
+		log.Printf("not on Cloud DNS")
 		color.Unset()
 		if *dryRun {
 			color.Set(color.FgHiYellow)
@@ -75,7 +80,7 @@ func main() {
 		wantMZptr := &clouddns.ManagedZone{
 			DnsName:     mz.FQDN,
 			Name:        dnsNameToMZName(mz.FQDN),
-			Description: fmt.Sprintf("created by mzadd %v", time.Now()),
+			Description: fmt.Sprintf("created by mzcreate %v", time.Now()),
 		}
 		newMZ, err := service.ManagedZones.Create(projectID, wantMZptr).Do()
 		if err != nil {
@@ -93,6 +98,6 @@ func main() {
 	log.SetPrefix("summary")
 	log.Printf("%v managed zone create", totalCreated)
 	if !exitOK {
-		log.Fatalf("some errors occurred")
+		log.Fatal("some errors occurred")
 	}
 }

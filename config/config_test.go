@@ -93,17 +93,11 @@ func TestNew(t *testing.T) {
 	{
 		_, err := New("testdata/nonexistent.yml")
 		assert.NotEqual(t, nil, err)
-		if err != nil {
-			assert.Equal(t, "open testdata/nonexistent.yml: no such file or directory", err.Error())
-		}
 	}
 	// broken format
 	{
 		_, err := New("testdata/broken-format.yml")
 		assert.NotEqual(t, nil, err)
-		if err != nil {
-			assert.Equal(t, "yaml: line 3: did not find expected key", err.Error())
-		}
 	}
 	// invalid configuration
 	{
@@ -117,21 +111,21 @@ func TestNew(t *testing.T) {
 		_, err := New("testdata/invalid-fqdn.yml")
 		assert.NotEqual(t, nil, err)
 		if err != nil {
-			assert.Equal(t, "managed zone `egym.de`: invalid FQDN: egym.de", err.Error())
+			assert.Equal(t, "managed zone egym.de: invalid FQDN: egym.de", err.Error())
 		}
 	}
 	{
 		_, err := New("testdata/invalid-mz-ttl.yml")
 		assert.NotEqual(t, nil, err)
 		if err != nil {
-			assert.Equal(t, "managed zone `egym.de.`: invalid TTL: -1", err.Error())
+			assert.Equal(t, "managed zone egym.de.: invalid TTL: -1", err.Error())
 		}
 	}
 	{
 		_, err := New("testdata/duplicate-mz.yml")
 		assert.NotEqual(t, nil, err)
 		if err != nil {
-			assert.Equal(t, "managed zone `egym.de.`: duplicate entry", err.Error())
+			assert.Equal(t, "managed zone egym.de.: duplicate entry", err.Error())
 		}
 	}
 	// valid configuration

@@ -1,6 +1,6 @@
 {
 	"server": "https://influx.egym.coffee:8086/",
-	"database": "dns",
-	"username": "dns",
+	"database": "dns-database",
+	"username": "dns-username",
 	"password": "topsecret"
 }

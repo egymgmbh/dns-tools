@@ -1,4 +1,4 @@
-// package main provides the rrpush which pushes zone information to CloudDNS
+// package main provides the rrpush which pushes zone information to Cloud DNS
 package main
 
 import (
@@ -6,12 +6,12 @@ import (
 	"log"
 	"time"
 
+	"github.com/fatih/color"
+	clouddns "google.golang.org/api/dns/v1"
+
 	"github.com/egymgmbh/dns-tools/config"
 	"github.com/egymgmbh/dns-tools/gcp"
 	"github.com/egymgmbh/dns-tools/rrdb"
-	"github.com/fatih/color"
-
-	clouddns "google.golang.org/api/dns/v1"
 )
 
 func main() {
@@ -19,11 +19,12 @@ func main() {
 	configFile := flag.String("config-file", "config.yml",
 		"DNS Tools configuration file.")
 	delay := flag.String("delay", "10s",
-		"Safeguard: Wait [delay] before taking action on CloudDNS.")
+		"Safeguard: Wait [delay] before taking action on Cloud DNS.")
 	dryRun := flag.Bool("dry-run", true,
-		"Do not take action on CloudDNS. Just pretend.")
-	gcpSAFile := flag.String("gcp-sa-file", "/secret/gcp-sa.json",
+		"Do not take action on Cloud DNS. Just pretend.")
+	gcpSAFile := flag.String("gcp-sa-file", "secret/gcp-sa.json",
 		"Google Cloud Platform Service Account file in JSON format.")
+	noColor := flag.Bool("no-color", false, "Do not colorize output.")
 	flag.Parse()
 
 	// validate flags
@@ -39,6 +40,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("get GCP service: %v", err)
 	}
+	color.NoColor = *noColor
 
 	// load local data
 	db, err := rrdb.NewFromDirectory(config.ZoneDataDirectory)
@@ -46,7 +48,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// fetch current managed zones and make a hash map for quick access
+	// fetch current managed zones and make a hash map for faster access
 	gcpMZListResponse, err := service.ManagedZones.List(projectID).Do()
 	if err != nil {
 		log.Fatalf("list managed zones: %v", err)
@@ -57,7 +59,7 @@ func main() {
 	}
 
 	// now we walk through the list of locally configured managed zones and
-	// try to find them on CloudDNS. If we find a zone, we will fetch the current
+	// try to find them on Cloud DNS. If we find a zone, we will fetch the current
 	// records and compare them with what our database wants to be there. We then
 	// calculate a diff and log the change before we apply it.
 	totalMissingInDatabase := 0
@@ -66,11 +68,11 @@ func main() {
 	totalDeletions := 0
 	totalAdditions := 0
 	for _, mz := range config.ManagedZones {
-		log.SetPrefix("zone " + mz.FQDN)
-		// check zone's availability von CloudDNS
+		log.SetPrefix(mz.FQDN + " ")
+		// check zone's availability on Cloud DNS
 		if _, ok := gcpManagedZones[mz.FQDN]; !ok {
 			color.Set(color.FgHiYellow)
-			log.Printf("CloudDNS: zone not found")
+			log.Printf("Cloud DNS: zone not found")
 			color.Unset()
 			totalMissingOnCloudDNS++
 			exitOK = false
@@ -88,13 +90,13 @@ func main() {
 			continue
 		}
 
-		// get currently active records from CloudDNS
+		// get currently active records from Cloud DNS
 		gcpRRListResponse, err := service.ResourceRecordSets.
 			List(projectID, gcpManagedZones[mz.FQDN]).
 			Do()
 		if err != nil {
 			color.Set(color.FgHiYellow)
-			log.Printf("CloudDNS: %v", err)
+			log.Printf("Cloud DNS: %v", err)
 			color.Unset()
 			totalFailed++
 			exitOK = false
@@ -107,7 +109,7 @@ func main() {
 		change := clouddns.Change{}
 		change.Deletions = gcp.FilterRRSets(gcpRRListResponse.Rrsets, mz.FQDN)
 		change.Additions = gcp.RRDBRecordsToCloudDNSRecords(records)
-		// Usually, most of the records we want on CloudDNS are already there from
+		// Usually, most of the records we want on Cloud DNS are already there from
 		// a previous deployment. So we remove this duplicates from change.Deletions
 		// and change.Additions. This leaves us with a nice diff and we only deploy
 		// this diff.
@@ -136,7 +138,7 @@ func main() {
 
 		// enforcing deployment delay
 		if delayDuration > 0 {
-			log.Printf("delaying change for %v seconds...", *delay)
+			log.Printf("delaying change for %v seconds...", delayDuration)
 			log.Printf("last chance to abort!")
 			time.Sleep(delayDuration)
 		}
@@ -149,7 +151,7 @@ func main() {
 			continue
 		}
 
-		// uploading change set
+		// uploading change
 		log.Printf("requesting change...")
 		chg := &change
 		chg, err = service.Changes.
@@ -162,9 +164,11 @@ func main() {
 			totalFailed++
 			continue
 		}
-		for chg.Status == "pending" {
+		pollCount := 0
+		for chg.Status == "pending" && pollCount < 30 {
 			log.Println("request pending...")
 			time.Sleep(500 * time.Millisecond)
+			pollCount++
 			chg, err = service.Changes.
 				Get(projectID, gcpManagedZones[mz.FQDN], chg.Id).
 				Do()
@@ -183,17 +187,17 @@ func main() {
 		totalDeletions += nDeletions
 		totalAdditions += nAdditions
 	}
-	log.SetPrefix("summary")
+	log.SetPrefix("summary ")
 	log.Printf("%v records removed, %v records created",
 		totalDeletions, totalAdditions)
 	log.Printf("%v managed zones, %v OK, %v failed, "+
-		"%v missing in local database, %v missing on CloudDNS",
+		"%v missing in local database, %v missing on Cloud DNS",
 		len(config.ManagedZones),
 		len(config.ManagedZones)-totalFailed-totalMissingInDatabase-totalMissingOnCloudDNS,
 		totalFailed,
 		totalMissingInDatabase,
 		totalMissingOnCloudDNS)
 	if !exitOK {
-		log.Fatalf("some errors occurred")
+		log.Fatal("some errors occurred")
 	}
 }

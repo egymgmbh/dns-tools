@@ -1,17 +1,19 @@
+// Package gcp provides helper functions for connecting to the Cloud DNS API and
+// for handling Cloud DNS-specific data types
 package gcp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"reflect"
 
-	"github.com/egymgmbh/dns-tools/rrdb"
-
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	clouddns "google.golang.org/api/dns/v1"
+
+	"github.com/egymgmbh/dns-tools/rrdb"
 )
 
 // GetDNSService creates a CloudDNS API service from a service account file
@@ -47,7 +49,7 @@ func GetDNSService(gcpSAFile string, readonly bool) (*clouddns.Service, string, 
 	}
 
 	// get CloudDNS API servive
-	client := conf.Client(oauth2.NoContext)
+	client := conf.Client(context.Background())
 	service, err := clouddns.New(client)
 	if err != nil {
 		return nil, "", fmt.Errorf("create API service: %v", err)
@@ -59,7 +61,7 @@ func GetDNSService(gcpSAFile string, readonly bool) (*clouddns.Service, string, 
 // RRDBRecordsToCloudDNSRecords converts RRDB records to CloudDNS
 // records (type: ResourceRecordSet)
 func RRDBRecordsToCloudDNSRecords(in []*rrdb.Record) []*clouddns.ResourceRecordSet {
-	out := []*clouddns.ResourceRecordSet{}
+	var out []*clouddns.ResourceRecordSet
 	for _, record := range in {
 		out = append(out, &clouddns.ResourceRecordSet{
 			Kind:    "dns#resourceRecordSet",
@@ -83,22 +85,27 @@ func removeNilPointersFromRRS(in []*clouddns.ResourceRecordSet) []*clouddns.Reso
 	return out
 }
 
+// recordID returns a unique ID for a ResourceRecordSet to be used as key in
+// hash maps
+func recordID(record *clouddns.ResourceRecordSet) string {
+	return fmt.Sprintf("%v|%v|%v|%v",
+		record.Kind, record.Name, record.Type, record.Ttl)
+}
+
 // RemoveDuplicatesFromChange compresses a CloudDNS change by removing
 // deletions and additions that would cancel each other out
 func RemoveDuplicatesFromChange(change *clouddns.Change) {
 	// build a map of the deletions for faster access
 	delIdxs := make(map[string]int)
 	for idx, record := range change.Deletions {
-		id := fmt.Sprintf("%v|%v|%v|%v",
-			record.Kind, record.Name, record.Type, record.Ttl)
+		id := recordID(record)
 		delIdxs[id] = idx
 	}
 
 	// iterate through additions and point all duplicate entries to nil
 	// duplicate means, there is an addition that is identical to a deletion
 	for idx, record := range change.Additions {
-		id := fmt.Sprintf("%v|%v|%v|%v",
-			record.Kind, record.Name, record.Type, record.Ttl)
+		id := recordID(record)
 		delIdx, ok := delIdxs[id]
 		if !ok ||
 			change.Deletions[delIdx] == nil ||
@@ -114,8 +121,8 @@ func RemoveDuplicatesFromChange(change *clouddns.Change) {
 	change.Deletions = removeNilPointersFromRRS(change.Deletions)
 }
 
-// LogPrintRRSets prints a resource record set  in a human readable way to the standard
-// logger
+// LogPrintRRSets prints a resource record set in a human readable way to the
+// standard logger
 func LogPrintRRSets(rrsets []*clouddns.ResourceRecordSet) {
 	for _, rrset := range rrsets {
 		log.Printf("*%v %v %v\n", rrset.Name, rrset.Type, rrset.Ttl)
@@ -125,7 +132,8 @@ func LogPrintRRSets(rrsets []*clouddns.ResourceRecordSet) {
 	}
 }
 
-// FilterRRSets removes resource record sets that should not touched from a list
+// FilterRRSets removes resource record sets that must not be managed by
+// dns-tools from a list. This is a safeguard.
 func FilterRRSets(rrsets []*clouddns.ResourceRecordSet, fqdn string) []*clouddns.ResourceRecordSet {
 	filtered := []*clouddns.ResourceRecordSet{}
 	for _, rr := range rrsets {

@@ -1,3 +1,7 @@
+// Package main provides the mzmon tool which fetches managed zones from Cloud
+// DNS,looks up the nameservers for that zones, and compares the result with
+// the expected nameservers. It does that continously and writes the results
+// as time series metrics into an InfluxDB.
 package main
 
 import (
@@ -13,9 +17,9 @@ import (
 )
 
 func main() {
-	gcpSAFile := flag.String("gcp-sa-file", "/secret/gcp-sa.json",
+	gcpSAFile := flag.String("gcp-sa-file", "secret/gcp-sa.json",
 		"Google Cloud Platform Service Account file in JSON format.")
-	influxConfigFile := flag.String("influx-config-file", "/secret/influx.json",
+	influxConfigFile := flag.String("influx-config-file", "secret/influx.json",
 		"InfluxDB configuration file in JSON format.")
 	pauseStr := flag.String("pause", "5m", "Pause between check runs.")
 	flag.Parse()
@@ -25,8 +29,7 @@ func main() {
 		log.Fatalf("DNS API service: %v", err)
 	}
 
-	var iconf influx.Config
-	err = iconf.Load(*influxConfigFile)
+	iconf, err := influx.LoadConfig(*influxConfigFile)
 	if err != nil {
 		log.Fatalf("load InfluxDB config: %v", err)
 	}
@@ -43,11 +46,20 @@ func main() {
 
 	// overall counters
 	gaugeOK := metrics.NewGauge()
-	metrics.Register("nsmon_"+projectID+"_total.OK", gaugeOK)
+	err = metrics.Register("nsmon_"+projectID+"_total.OK", gaugeOK)
+	if err != nil {
+		log.Fatalf("register metric: %v", err)
+	}
 	gaugeMismatch := metrics.NewGauge()
-	metrics.Register("nsmon_"+projectID+"_total.Mismatch", gaugeMismatch)
+	err = metrics.Register("nsmon_"+projectID+"_total.Mismatch", gaugeMismatch)
+	if err != nil {
+		log.Fatalf("register metric: %v", err)
+	}
 	gaugeError := metrics.NewGauge()
-	metrics.Register("nsmon_"+projectID+"_total.Error", gaugeError)
+	err = metrics.Register("nsmon_"+projectID+"_total.Error", gaugeError)
+	if err != nil {
+		log.Fatalf("register metric: %v", err)
+	}
 
 	// main loop, where we check all managed zones and their delegations
 	mzMetrics := make(map[string]metrics.Gauge)
@@ -58,28 +70,27 @@ func main() {
 			log.Fatalf("list managed zones: %v", err)
 		}
 
-		// sometimes, we discover new zones and need to create gauges in-the-fly
+		var statsError, statsOK, statsMismatch int64
+
 		for _, managedZone := range managedZones.ManagedZones {
+			// sometimes, we discover new zones and need to create gauges on-the-fly
 			if _, ok := mzMetrics[managedZone.Name]; !ok {
 				mzMetrics[managedZone.Name] = metrics.NewGauge()
-				metrics.Register("nsmon_"+projectID+"_managedzone."+managedZone.Name,
+				err = metrics.Register("nsmon_"+projectID+"_managedzone."+managedZone.Name,
 					mzMetrics[managedZone.Name])
+				if err != nil {
+					log.Fatalf("register metric: %v", err)
+				}
 			}
-		}
 
-		statsError := int64(0)
-		statsOK := int64(0)
-		statsMismatch := int64(0)
-
-		for _, managedZone := range managedZones.ManagedZones {
 			curNameServers, err := lib.Lookup(managedZone.DnsName, "NS")
 			if err != nil {
 				mzMetrics[managedZone.Name].Update(-1)
 				statsError++
 				continue
 			}
-			if lib.RDatasEqual(curNameServers, managedZone.NameServers) &&
-				len(curNameServers) > 0 {
+			if len(curNameServers) > 0 &&
+				lib.RDatasEqual(curNameServers, managedZone.NameServers) {
 				mzMetrics[managedZone.Name].Update(1)
 				statsOK++
 			} else {

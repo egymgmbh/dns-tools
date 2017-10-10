@@ -239,7 +239,7 @@ func TestDBNew(t *testing.T) {
 	db := New()
 	assert.NotEqual(t, nil, db)
 	assert.NotEqual(t, nil, db.root)
-	assert.Equal(t, 0, len(db.root.nodes))
+	assert.Equal(t, 0, len(db.root.children))
 }
 
 func TestDBNode(t *testing.T) {

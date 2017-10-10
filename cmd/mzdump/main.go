@@ -1,3 +1,5 @@
+// Package main provides the mzdump tool which outputs a list of managed zones
+// from Cloud DNS via customizable template.
 package main
 
 import (
@@ -46,5 +48,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("list managed zones: %v", err)
 	}
-	tmpl.Execute(os.Stdout, managedZones)
+	err = tmpl.Execute(os.Stdout, managedZones)
+	if err != nil {
+		log.Fatalf("execute template: %v", err)
+	}
 }

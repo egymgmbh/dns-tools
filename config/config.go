@@ -1,9 +1,13 @@
+// Package config parses a YAML-formatted dns-tools configuration file for
+// further use in the tools
 package config
 
 import (
 	"fmt"
 	"io/ioutil"
 	"regexp"
+
+	"github.com/egymgmbh/dns-tools/lib"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -15,27 +19,13 @@ var (
 // ManagedZoneDefaults holds the default configuration fo  managed zones
 type ManagedZoneDefaults struct {
 	TTL int
-	//	SOA  ManagedZoneSOAConfig
 }
 
 // ManagedZoneConfig holds a managed zone's configuration
 type ManagedZoneConfig struct {
 	FQDN string
 	TTL  int
-	//	SOA  ManagedZoneSOAConfig
 }
-
-/*
-// ManagedZoneSOAConfig holds the Start Of Authority configuration of a
-// managed zone
-type ManagedZoneSOAConfig struct {
-	TTL     int32 <-- must always be 0 or positive, bit only holds values up to 2^32-1 according to RFC 2181
-	Refresh int
-	Retry   int
-	Expire  int
-	NegTTL  int32
-}
-*/
 
 // Config holds the dns-tools configuration
 type Config struct {
@@ -44,32 +34,32 @@ type Config struct {
 	ManagedZones      []ManagedZoneConfig
 }
 
-// YAMLConfig holds exactly one dns-tools configuration
-type YAMLConfig struct {
+// yamlConfig holds exactly one dns-tools configuration
+type yamlConfig struct {
 	Config Config
 }
 
 // New creates a new database instance
 func New(fname string) (*Config, error) {
-	yamlConfig := YAMLConfig{}
+	yamlConfigData := yamlConfig{}
 	data, err := ioutil.ReadFile(fname)
 	if err != nil {
 		return nil, err
 	}
-	err = yaml.UnmarshalStrict(data, &yamlConfig)
+	err = yaml.UnmarshalStrict(data, &yamlConfigData)
 	if err != nil {
 		return nil, err
 	}
-	config := yamlConfig.Config
+	config := yamlConfigData.Config
 
 	// verify defaults
 	err = checkTTL(config.Defaults.TTL)
 	if err != nil {
 		return nil, fmt.Errorf("defaults: %v", err)
 	}
-	// checkSOA()
 
-	// verify individual managed zones
+	// verify individual managed zones and set default TTL if no individual TTL
+	// configured
 	seen := make(map[string]bool)
 	for idx := range config.ManagedZones {
 		mz := &config.ManagedZones[idx] // uses actual data, not local copy
@@ -80,16 +70,16 @@ func New(fname string) (*Config, error) {
 		// check name
 		err = checkFQDN(mz.FQDN)
 		if err != nil {
-			return nil, fmt.Errorf("managed zone `%v`: %v", mz.FQDN, err)
+			return nil, fmt.Errorf("managed zone %v: %v", mz.FQDN, err)
 		}
 		// check managed zone default TTL
 		err = checkTTL(mz.TTL)
 		if err != nil {
-			return nil, fmt.Errorf("managed zone `%v`: %v", mz.FQDN, err)
+			return nil, fmt.Errorf("managed zone %v: %v", mz.FQDN, err)
 		}
 		// check for duplicate zones
 		if _, ok := seen[mz.FQDN]; ok {
-			return nil, fmt.Errorf("managed zone `%v`: duplicate entry", mz.FQDN)
+			return nil, fmt.Errorf("managed zone %v: duplicate entry", mz.FQDN)
 		}
 		seen[mz.FQDN] = true
 	}
@@ -104,7 +94,14 @@ func checkFQDN(fqdn string) error {
 }
 
 func checkTTL(ttl int) error {
-	if ttl < 1 || ttl > 2147483647 {
+	err := lib.IsValidTTL(ttl)
+	if err != nil {
+		return err
+	}
+	// we can not allow zero TTLs in configuration files because a zero means
+	// default TTL, and here in the configuration we set the default TTLs for the
+	// zones
+	if ttl == 0 {
 		return fmt.Errorf("invalid TTL: %v", ttl)
 	}
 	return nil

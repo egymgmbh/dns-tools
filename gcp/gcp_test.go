@@ -101,6 +101,20 @@ func TestRRDBRecordsToCloudDNSRecords(t *testing.T) {
 	}
 }
 
+func TestRecordID(t *testing.T) {
+	{
+		in := clouddns.ResourceRecordSet{
+			Kind:    "dns#resourceRecordSet",
+			Name:    "foo.test.",
+			Type:    "TXT",
+			Ttl:     300,
+			Rrdatas: []string{},
+		}
+		id := recordID(&in)
+		assert.Equal(t, "dns#resourceRecordSet|foo.test.|TXT|300", id)
+	}
+}
+
 func TestRemoveDuplicatesFromChange(t *testing.T) {
 	// empty
 	{
