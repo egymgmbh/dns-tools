@@ -1,9 +1,6 @@
 package gcp
 
 import (
-	"bytes"
-	"log"
-	"os"
 	"path"
 	"testing"
 
@@ -201,13 +198,9 @@ func TestRemoveDuplicatesFromChange(t *testing.T) {
 	}
 }
 
-func TestLogPrintRRSets(t *testing.T) {
+func TestFormatRRSets(t *testing.T) {
 	{
-		var buf bytes.Buffer
-		log.SetOutput(&buf)
-		defer log.SetOutput(os.Stderr)
-		log.SetFlags(0)
-		LogPrintRRSets([]*clouddns.ResourceRecordSet{
+		out := FormatRRSets([]*clouddns.ResourceRecordSet{
 			{
 				Kind:    "dns#resourceRecordSet",
 				Name:    "foo.test.",
@@ -216,8 +209,9 @@ func TestLogPrintRRSets(t *testing.T) {
 				Rrdatas: []string{"2001:db8::1", "2001:db8:10::99"},
 			},
 		})
-		assert.Equal(t, "*foo.test. AAAA 300\n *2001:db8::1\n *2001:db8:10::99\n",
-			buf.String())
+		assert.Equal(t,
+			[]string{"*foo.test. AAAA 300", " *2001:db8::1", " *2001:db8:10::99"},
+			out)
 	}
 }
 

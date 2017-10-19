@@ -125,13 +125,17 @@ func main() {
 			if nDeletions > 0 {
 				log.Printf("%v records to be deleted", nDeletions)
 				color.Set(color.FgRed)
-				gcp.LogPrintRRSets(change.Deletions)
+				for _, line := range gcp.FormatRRSets(change.Deletions) {
+					log.Print(line)
+				}
 				color.Unset()
 			}
 			if nAdditions > 0 {
 				log.Printf("%v records to be added", nAdditions)
 				color.Set(color.FgGreen)
-				gcp.LogPrintRRSets(change.Additions)
+				for _, line := range gcp.FormatRRSets(change.Additions) {
+					log.Print(line)
+				}
 				color.Unset()
 			}
 		}

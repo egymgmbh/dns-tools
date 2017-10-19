@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"reflect"
 
 	"golang.org/x/oauth2/google"
@@ -121,15 +120,18 @@ func RemoveDuplicatesFromChange(change *clouddns.Change) {
 	change.Deletions = removeNilPointersFromRRS(change.Deletions)
 }
 
-// LogPrintRRSets prints a resource record set in a human readable way to the
-// standard logger
-func LogPrintRRSets(rrsets []*clouddns.ResourceRecordSet) {
+// FormatRRSets formats a resource record set in a human readable way and
+// returns a slice of strings that can be used for printing to screen or log
+func FormatRRSets(rrsets []*clouddns.ResourceRecordSet) []string {
+	var out []string
 	for _, rrset := range rrsets {
-		log.Printf("*%v %v %v\n", rrset.Name, rrset.Type, rrset.Ttl)
+		out = append(out, fmt.Sprintf("*%v %v %v",
+			rrset.Name, rrset.Type, rrset.Ttl))
 		for _, rdata := range rrset.Rrdatas {
-			log.Printf(" *%v\n", rdata)
+			out = append(out, fmt.Sprintf(" *%v", rdata))
 		}
 	}
+	return out
 }
 
 // FilterRRSets removes resource record sets that must not be managed by
