@@ -1,6 +1,7 @@
 # dns-tools
 
 [![Build Status](https://travis-ci.org/egymgmbh/dns-tools.svg?branch=master)](https://travis-ci.org/egymgmbh/dns-tools)
+[![codecov](https://codecov.io/gh/egymgmbh/dns-tools/branch/master/graph/badge.svg)](https://codecov.io/gh/egymgmbh/dns-tools)
 [![Go Report Card](https://goreportcard.com/badge/github.com/egymgmbh/dns-tools)](https://goreportcard.com/report/github.com/egymgmbh/dns-tools)
 
 The dns-tools parse resource record and zone information from YAML-formatted
@@ -215,8 +216,8 @@ sections.
 
 ## License
 
-    Copyright 2017 eGym GmbH <support@egym.de>
-    Copyright 2017 Dan Luedtke <dan.luedtke@egym.de>
+    Copyright 2017-2018 eGym GmbH <support@egym.de>
+    Copyright 2017-2018 Dan Luedtke <dan.luedtke@egym.de>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
