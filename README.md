@@ -127,19 +127,19 @@ templates:
           ttl: 604800 # 1 week = 604800 seconds
           mailservers:
             - mailserver: aspmx.l.google.com.
-              priority: 10
+              pre: 10
             - mailserver: alt1.aspmx.l.google.com.
-              priority: 20
+              preference: 20
             - mailserver: alt2.aspmx.l.google.com.
-              priority: 20
+              preference: 20
             - mailserver: aspmx2.googlemail.com.
-              priority: 30
+              preference: 30
             - mailserver: aspmx3.googlemail.com.
-              priority: 30
+              preference: 30
             - mailserver: aspmx4.googlemail.com.
-              priority: 30
+              preference: 30
             - mailserver: aspmx5.googlemail.com.
-              priority: 30
+              preference: 30
       - name: google._domainkey
         texts:
           data:
